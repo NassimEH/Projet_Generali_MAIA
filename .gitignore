@@ -1,8 +1,122 @@
+# --- Python ---
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Tests / qualité de code
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+hypothesis/
+
+# --- Jupyter / notebooks ---
 .ipynb_checkpoints/
+*/.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+
+# --- Données & modèles (lourds ou régénérables) ---
+# Décommenter si vous ne voulez pas versionner les CSV sur GitHub :
+# X_train.csv
+# X_test.csv
+# y_train*.csv
+
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.onnx
+models/
+checkpoints/
+mlruns/
+.wandb/
+
+# Soumission / figures (régénérables via les scripts — décommenter pour ne pas les pousser) :
+# submission_proba.csv
+# figures/
+
+# --- Secrets & config locale ---
 .env
 .env.*
-*.log
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+
+# --- IDE / éditeurs ---
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# --- OS ---
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
+
+# --- Logs & caches ---
+*.log
+logs/
+.cache/
+*.tmp
+*.temp
+*.bak
+
+# --- Scripts / brouillons temporaires (debug local) ---
+_dump*
+_find*
+_s[0-9]*.txt
+_*.py
+!__init__.py
+
+# --- Dossiers de travail local ---
+documentation/scratch/
+scratch/
+tmp/
+temp/
