@@ -241,10 +241,12 @@ Sur 100 bâtiments environ, **23** ont eu un sinistre et **77** non.
 
 ![Déséquilibre des classes sinistre / non-sinistre](figures/02_target_desequilibre.png)
 
-| Ce qu’on voit | Interprétation |
-|---------------|----------------|
-| Barre bleue (0) beaucoup plus haute que rouge (1) | **Peu de sinistres** dans les données : environ **1 bâtiment sur 4** a `target = 1`. |
-| Graphique de droite ~23 % | Même message en proportion : le modèle ne doit pas « tout prédire à 0 ». |
+| Graphique | Interprétation courte |
+|-----------|------------------------|
+| **Gauche (effectifs)** | ≈ **7 900** bâtiments sans sinistre vs ≈ **2 300** avec sinistre — la classe sinistre est **minoritaire**. |
+| **Droite (proportions)** | ≈ **77 %** sans sinistre, **23 %** avec — un modèle qui répond toujours « 0 » aurait ~77 % de bonnes réponses **sans être utile**. |
+
+**Pourquoi on cite Gini et SMOTE plus tard :** l’accuracy compte les bonnes réponses ; le **Gini** vérifie surtout si les vrais sinistres sont **bien classés en tête de liste**. Le **SMOTE** aide l’entraînement à ne pas ignorer les 23 % de sinistres rares.
 
 #### Valeurs manquantes
 
@@ -329,7 +331,7 @@ Un boxplot résume : médiane, quartiles, et les **points isolés** = valeurs tr
 - Quelques monstres à **30 000 m²** → points tout en haut du graphique
 - **Conclusion :** la superficie est très **étalée** ; quelques énormes bâtiments tirent les stats vers le haut
 
-**Exemple `ft_2_categ` :** ce sont surtout des **années** (2012–2016) → le boxplot n’apporte pas grand-chose (peu de surprise).
+**Exemple `ft_2_categ` :** ce sont surtout des **années** (2012–2016) → on utilise un **histogramme** plutôt qu’un boxplot (peu de surprise).
 
 #### 2. Corriger `EXPO` — temps d’assurance sur l’année
 
@@ -459,7 +461,7 @@ Les modèles du cours ne lisent pas directement `V`, `N`, `O` ou des codes texte
 
 | Bloc | Cellules (indicatif) | Action |
 |------|----------------------|--------|
-| **3.1 Boxplots** | `describe`, boxplots | Stats globales puis `superficief`, `EXPO`, `ft_22_categ`, `ft_2_categ` |
+| **3.1 Boxplots / histogrammes** | `describe`, boxplots | `superficief`, `EXPO` (boxplots) ; histogrammes pour `ft_2_categ` (2012–2016) et `ft_22_categ` (années construction) |
 | **Conversion EXPO** | remplacement `,` → `.`, `astype(float)` | Rendre `EXPO` exploitable numériquement |
 | **Percentile manuel** | tri de `superficief`, 25ᵉ percentile | Illustration cours (lien boîte à moustaches / quartiles) |
 | **Histogrammes** | `hist` sur 4 variables, puis `bins=3` | Vue d’ensemble des distributions |
