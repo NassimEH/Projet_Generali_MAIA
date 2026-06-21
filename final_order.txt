@@ -1,0 +1,9 @@
+﻿185 code # The silhouette_score gives the average value for all the samples. # This gives
+186 code sample_silhouette_values = silhouette_diagram(X_sub, clusters, K)
+187 markdown **Exploration anomalies (º6.a)** ù distance au centro´de du cluster (non supervi
+188 code # º6.a ù Score d'anomalie (distance au centro´de du cluster K-means) from sklear
+189 markdown ### PrÚrequis ù section 7 (soumission autonome)  Fonctions de prÚtraitement et s
+190 code # --- Pipeline soumission (logique df_cleaned º3) ù notebook autonome --- from s
+191 markdown # 7. Soumission challenge Generali  Produire **`submission_proba.csv`** : `Ident
+192 code from pathlib import Path import matplotlib.pyplot as plt  DATA_DIR = Path(".") s
+193 markdown **InterprÚtation ù soumission (º7)**  - **3 412 lignes** = 100 % de `X_test.csv`

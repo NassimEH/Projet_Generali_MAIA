@@ -604,7 +604,7 @@ Le notebook enchaîne avec **RandomizedSearchCV** (recherche d’hyperparamètre
 | **4.3** | Régression multivariée |
 | **4.4–4.5** | Polynômes, Ridge, validation croisée |
 | **4.6** | Logistique, normalisation, SMOTE, `plot_conf_mat` |
-| **4.7** | `RandomForestClassifier`, SMOTE, importances, `RandomizedSearchCV` |
+| **4.7** | `RandomForestClassifier`, SMOTE, importances, `RandomizedSearchCV` (**score = Gini normalisé**) |
 
 ---
 
@@ -620,7 +620,7 @@ Tester un **perceptron multicouche (MLP)** : un réseau de neurones qui apprend 
 |--------|--------|
 | Cellules ajoutées au notebook | Prérequis MLP (split 80/20, `StandardScaler`, SMOTE) avant les cellules MLP d’origine |
 | Entraînement | `MLPClassifier` (2 couches de 40 neurones, activation `logistic`, early stopping) |
-| Tuning | `RandomizedSearchCV` léger (8 combinaisons, 3 folds) — version rapide pour le README |
+| Tuning | `RandomizedSearchCV` (8 combinaisons, 3 folds, score = **Gini normalisé**) |
 | Figures | `05_mlp_confusion.png`, `05_mlp_tuning_scores.png` |
 | Script | `python run_sections_5_6_submission.py` régénère figures + métriques |
 
@@ -639,8 +639,8 @@ Imagine plusieurs **calculs en chaîne** : chaque couche transforme les entrées
 | Métrique | Valeur | Lecture |
 |----------|--------|---------|
 | Accuracy test (MLP + SMOTE) | **~0,69** | Comparable à la logistique avec SMOTE (~0,70) sur ce jeu réduit à 2 variables |
-| Meilleur score CV (RandomizedSearch) | **~0,65** | La recherche d’hyperparamètres n’a pas battement nettement le modèle simple ici |
-| Accuracy test après tuning | **~0,63** | Le meilleur modèle en CV ne généralise pas toujours mieux sur le hold-out |
+| Meilleur score CV (RandomizedSearch, **Gini**) | **~0,43** | Hyperparamètres optimisés pour le Gini, pas l’accuracy |
+| Gini test (hold-out 2 variables) | **~0,43** | Même ordre de grandeur que la logistique sur ce jeu réduit |
 
 > Le notebook d’origine propose une grille plus large (`n_iter` plus élevé) : plus long à lancer sur un PC ; le script utilise une version **allégée** pour documenter le pipeline.
 
@@ -760,11 +760,13 @@ Produire un fichier **soumission** pour [Challenge Data](https://challengedata.e
 
 | Action | Détail |
 |--------|--------|
-| Modèle retenu (pipeline script) | `RandomForestClassifier` (100 arbres, `max_leaf_nodes=32`) |
-| Prétraitement | `superficief` + `EXPO`, `StandardScaler`, **SMOTE** sur tout le train |
-| Fichier généré | **`submission_proba.csv`** — **2 971** lignes (lignes de `X_test` sans valeurs manquantes sur les features utilisées) |
-| Validation interne | Hold-out 20 % du train : **Gini normalisé ~0,41** (indicatif, 2 features seulement) |
+| Module | **`ml_pipeline.py`** — encodage train/test, métrique Gini, `make_submission()` |
+| Modèle retenu | `RandomForestClassifier` + **SMOTE**, tuning **RandomizedSearchCV** (score = **Gini normalisé**) |
+| Prétraitement | Logique **`df_cleaned`** complète (~**1 503** colonnes) ; imputation sur le train, **aucun dropna** sur le test |
+| Fichier généré | **`submission_proba.csv`** — **3 412** lignes (100 % de `X_test`) |
+| Validation interne | Hold-out 20 % du train : **Gini normalisé ~0,33** ; meilleur score CV ~**0,35** (indicatif) |
 | Figure | `07_submission_proba_hist.png` — distribution des probabilités sur le test |
+| Notebook | Section **7** ajoutée dans `Projet.ipynb` (cellules soumission + histogramme) |
 
 ### Comprendre simplement — Gini et probabilités
 
@@ -774,7 +776,7 @@ Produire un fichier **soumission** pour [Challenge Data](https://challengedata.e
 | **Gini normalisé** | Mesure si les bâtiments **à risque** sont bien **en haut** de votre liste triée par probabilité décroissante |
 | **Pas la même chose que l’accuracy** | Vous pouvez avoir une accuracy correcte mais un mauvais Gini si l’**ordre** des risques est mauvais |
 
-Formule utilisée dans `run_sections_5_6_submission.py` : Gini du modèle divisé par le Gini d’un **classeur parfait** (même formule que les challenges type assurance / Kaggle).
+Formule dans **`ml_pipeline.py`** : Gini du modèle divisé par le Gini d’un **classeur parfait** (même formule que les challenges type assurance / Kaggle). Le tuning (RF et MLP) utilise ce score, pas l’accuracy.
 
 ### Fichier de soumission
 
@@ -796,9 +798,9 @@ Identifiant,target
 
 | Ce qu’on voit | Interprétation |
 |---------------|----------------|
-| Beaucoup de valeurs basses | Le modèle est **prudent** : la plupart des bâtiments ont une proba modérée |
-| Queue vers 1 | Quelques profils jugés plus risqués — utiles pour le tri Gini |
-| Pistes d’amélioration | Utiliser **`df_cleaned`** (one-hot complet), tuning RF, calibration, autres modèles (logistique, MLP) |
+| Beaucoup de valeurs basses à modérées | Le modèle est **prudent** sur la majorité du parc |
+| Queue vers 1 | Quelques profils jugés plus risqués — utiles pour le **tri Gini** |
+| 3 412 bâtiments | Couverture **complète** du fichier test (imputation train, pas de `dropna` sur le test) |
 
 ### Comment régénérer
 
@@ -815,14 +817,15 @@ Produit : figures `05_*`, `06_*`, `07_*` + `submission_proba.csv` + métriques a
 
 | Fichier | Note |
 |---------|------|
-| `Projet.ipynb` | Fil principal — EDA, régressions, classification, MLP |
-| `Forêt aléatoire.ipynb` | Variante centrée forêt aléatoire |
+| `Projet.ipynb` | Fil principal — EDA, régressions, classification, MLP, K-means, **soumission (§7)** |
+| `Forêt aléatoire.ipynb` | Variante exploratoire centrée forêt aléatoire |
 | `dimensionality-reduction.ipynb` | Variante avec réduction de dimension (SVD) |
+| `ml_pipeline.py` | Prétraitement train/test, Gini normalisé, génération `submission_proba.csv` |
 | `figures/` | Graphiques intégrés au README (sections 2 à 7) |
 | `generate_figures.py` | Régénère les figures des sections 2–3 |
 | `run_section4_metrics.py` | Régénère les figures + métriques clés de la section 4 |
-| `run_sections_5_6_submission.py` | Sections 5–6 + `submission_proba.csv` + figure 07 |
-| `submission_proba.csv` | Fichier de soumission (probabilités sur `X_test`) |
+| `run_sections_5_6_submission.py` | Sections 5–6–7 + `submission_proba.csv` + figures 05–07 |
+| `submission_proba.csv` | Fichier de soumission (**3 412** probabilités sur `X_test`) |
 
 ---
 
@@ -836,4 +839,4 @@ Produit : figures `05_*`, `06_*`, `07_*` + `submission_proba.csv` + métriques a
 **8 mai 2026** — Section 4 modélisation : entrée locale Windows, figures 04_*, README vulgarisé (`run_section4_metrics.py`).  
 **11 mai 2026** — Section 5 (MLP) : prérequis notebook, figures 05_*, README section 5 (`run_sections_5_6_submission.py`).  
 **13 mai 2026** — Section 6 (K-means) : correction `wget`, figures 06_*, README section 6.  
-**15 mai 2026** — Soumission challenge : `submission_proba.csv`, figure 07, README section 7.
+**15 mai 2026** — Soumission challenge : pipeline `ml_pipeline.py`, **3 412** lignes, tuning Gini, section 7 notebook, figure 07.

@@ -18,6 +18,7 @@ from sklearn.preprocessing import StandardScaler
 
 import visualization
 from andrea_models import subsample
+from ml_pipeline import gini_scorer, make_submission
 
 
 def gini_coefficient(y_true, y_pred):
@@ -82,6 +83,9 @@ def main():
     mlp.fit(X_bal, y_bal)
     y_mlp = mlp.predict(X_te_s)
     metrics["MLP accuracy (test, SMOTE train)"] = round(accuracy_score(y_te, y_mlp), 4)
+    metrics["MLP Gini normalisé (test)"] = round(
+        normalized_gini(y_te.values, mlp.predict_proba(X_te_s)[:, 1]), 4
+    )
 
     visualization.plot_conf_mat(
         y_te, y_mlp, np.array(["pas sinistre", "sinistre"]), width=6, height=5
@@ -101,25 +105,31 @@ def main():
         mlp_base,
         param_dist,
         n_iter=8,
-        scoring="accuracy",
+        scoring=gini_scorer,
         cv=3,
         random_state=45,
         n_jobs=-1,
     )
     search.fit(X_bal, y_bal)
     metrics["MLP RandomizedSearchCV (meilleur CV)"] = round(search.best_score_, 4)
-    metrics["MLP RandomizedSearchCV (test)"] = round(search.score(X_te_s, y_te), 4)
+    metrics["MLP RandomizedSearchCV (test Gini)"] = round(
+        normalized_gini(y_te.values, search.predict_proba(X_te_s)[:, 1]), 4
+    )
+    metrics["MLP RandomizedSearchCV (test accuracy)"] = round(
+        accuracy_score(y_te, search.predict(X_te_s)), 4
+    )
 
     fig, ax = plt.subplots(figsize=(6, 4))
+    test_gini = normalized_gini(y_te.values, search.predict_proba(X_te_s)[:, 1])
     ax.bar(
-        ["CV (meilleur)", "Test"],
-        [search.best_score_, search.score(X_te_s, y_te)],
+        ["CV Gini (meilleur)", "Test Gini"],
+        [search.best_score_, test_gini],
         color=["#4c72b0", "#c44e52"],
     )
     ax.set_ylim(0, 1)
-    ax.set_ylabel("Accuracy")
-    ax.set_title("5 — MLP après recherche d'hyperparamètres")
-    for i, v in enumerate([search.best_score_, search.score(X_te_s, y_te)]):
+    ax.set_ylabel("Gini normalisé")
+    ax.set_title("5 — MLP après recherche d'hyperparamètres (score = Gini)")
+    for i, v in enumerate([search.best_score_, test_gini]):
         ax.text(i, v + 0.02, f"{v:.2f}", ha="center")
     plt.tight_layout()
     plt.savefig(fig_dir / "05_mlp_tuning_scores.png", dpi=120, bbox_inches="tight")
@@ -167,42 +177,27 @@ def main():
     plt.savefig(fig_dir / "06_kmeans_clusters_hist.png", dpi=120, bbox_inches="tight")
     plt.close()
 
-    # ========== Soumission challenge ==========
-    X_test_df = X_test_file.dropna().copy()
-    if X_test_df["EXPO"].dtype == "object":
-        X_test_df["EXPO"] = X_test_df["EXPO"].str.replace(",", ".", regex=False).astype(
-            float
-        )
-    ids_test = X_test_df["Identifiant"].copy()
-    X_test_m = X_test_df[cols]
+    # ========== Section 7 — Soumission challenge (pipeline df_cleaned complet) ==========
+    # Ancienne version (2 features + dropna sur test) remplacée par make_submission()
+    # pour couvrir les 3 412 lignes de X_test — voir ml_pipeline.py
+    submission, sub_metrics = make_submission(data_dir, random_state=5, tune=True)
+    submission.to_csv(data_dir / "submission_proba.csv", index=False)
+    metrics["Lignes soumission"] = sub_metrics["n_test_submission"]
+    metrics["Gini normalisé (validation hold-out 20%)"] = sub_metrics[
+        "gini_validation_holdout"
+    ]
+    metrics["Features encodées (soumission)"] = sub_metrics["n_features"]
+    metrics["Gini CV (meilleur, soumission)"] = sub_metrics.get("gini_cv_best")
 
-    sc_sub = StandardScaler()
-    X_full_s = sc_sub.fit_transform(df[cols])
-    X_test_s = sc_sub.transform(X_test_m)
-    X_full_b, y_full_b = SMOTE(random_state=42).fit_resample(X_full_s, df["target"])
-
-    rf_sub = RandomForestClassifier(
-        n_estimators=100, max_leaf_nodes=32, random_state=5, n_jobs=-1
-    )
-    rf_sub.fit(X_full_b, y_full_b)
-    proba_test = rf_sub.predict_proba(X_test_s)[:, 1]
-
-    sub = pd.DataFrame({"Identifiant": ids_test, "target": proba_test})
-    sub.to_csv(data_dir / "submission_proba.csv", index=False)
-    metrics["Lignes soumission"] = len(sub)
-    metrics["Gini normalisé (validation hold-out 20%)"] = round(
-        normalized_gini(
-            df_te["target"].values,
-            rf_sub.predict_proba(sc_sub.transform(df_te[cols]))[:, 1],
-        ),
-        4,
-    )
-
+    proba_test = submission["target"].values
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.hist(proba_test, bins=30, color="#8172b3", edgecolor="white")
     ax.set_xlabel("Probabilité prédite de sinistre")
     ax.set_ylabel("Nombre de bâtiments (test)")
-    ax.set_title("Soumission — distribution des probabilités sur X_test")
+    ax.set_title(
+        f"Soumission — {len(submission)} bâtiments, "
+        f"{sub_metrics['n_features']} features encodées"
+    )
     plt.tight_layout()
     plt.savefig(fig_dir / "07_submission_proba_hist.png", dpi=120, bbox_inches="tight")
     plt.close()
