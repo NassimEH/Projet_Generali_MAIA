@@ -95,6 +95,7 @@ Regroupe des fonctions de **visualisation** (matplotlib / seaborn) pour ne pas t
 | **`rotate_labels`** | Pivoter les labels d’une **scatter matrix** pour la lisibilité. |
 | **`plot_conf_mat`** | **Matrice de confusion** lisible (normalisée ou non) — celle qu’on importe explicitement en cellule 4. |
 | **`plot_feature_importances`** | Barres des **importances** (forêt aléatoire, etc.). |
+| **`plot_rf_classification_dashboard`** | Tableau de bord RF : matrice (effectifs + %), rappel/précision, courbe PR, top importances. |
 | **`silhouette_diagram`** | Qualité des **clusters** (K-means, section 6 du notebook). |
 | **`plot_roc_curve`**, **`plot_precision_recall_curve`**, etc. | Courbes **ROC / précision-rappel** pour évaluer un classifieur ou un détecteur d’anomalies. |
 
@@ -416,13 +417,13 @@ Les modèles du cours ne lisent pas directement `V`, `N`, `O` ou des codes texte
 
 #### Exposition (`EXPO`)
 
-![Boxplot de EXPO](figures/03_boxplot_expo.png)
+![Distribution de EXPO](figures/03_boxplot_expo.png)
 
 | Ce qu’on voit | Interprétation |
 |---------------|----------------|
-| Boîte collée en haut (valeur 1) | **~76 %** des contrats couvrent **l’année entière** (`EXPO = 1`). |
-| Points en dessous | Contrats **partiels** (ex. 0,5 = 6 mois) — minorité mais réelle. |
-| Pour le modèle | Variable utile (citée dans le PDF du challenge) ; peu de dispersion pour la majorité. |
+| Barre « année pleine » dominante | **~76 %** des contrats couvrent **l’année entière** (`EXPO = 1`). |
+| Barres des tranches partielles | **~24 %** de couvertures incomplètes, souvent **proches de 1** (0,95–1) ou réparties entre 0 et 0,75. |
+| Pour le modèle | Variable utile (citée dans le PDF du challenge) ; le boxplot seul ne montrait pas cette structure. |
 
 #### Corrélations entre variables numériques
 
@@ -451,7 +452,7 @@ Les modèles du cours ne lisent pas directement `V`, `N`, `O` ou des codes texte
 | Panneau | Interprétation |
 |---------|----------------|
 | **superficief** | Forte asymétrie : pic à gauche (petits bâtiments), longue traîne à droite. |
-| **EXPO** | Pic massif à **1** ; peu de valeurs intermédiaires. |
+| **EXPO** | **~76 %** à **1** (année pleine) ; **~24 %** partiels, souvent proches de 1 ou répartis par tranches. |
 | **ft_22_categ** | Forme « année de construction » — masse autour des années 1960–1980. |
 | **ft_2_categ** | Années d’observation 2012–2016 — peu varié. |
 
@@ -461,7 +462,7 @@ Les modèles du cours ne lisent pas directement `V`, `N`, `O` ou des codes texte
 
 | Bloc | Cellules (indicatif) | Action |
 |------|----------------------|--------|
-| **3.1 Boxplots / histogrammes** | `describe`, boxplots | `superficief`, `EXPO` (boxplots) ; histogrammes pour `ft_2_categ` (2012–2016) et `ft_22_categ` (années construction) |
+| **3.1 Boxplots / histogrammes** | `describe`, boxplots | `superficief` (boxplot) ; `EXPO` (barres année pleine / partielle + tranches) ; histogrammes pour `ft_2_categ` (2012–2016) et `ft_22_categ` (années construction) |
 | **Conversion EXPO** | remplacement `,` → `.`, `astype(float)` | Rendre `EXPO` exploitable numériquement |
 | **Percentile manuel** | tri de `superficief`, 25ᵉ percentile | Illustration cours (lien boîte à moustaches / quartiles) |
 | **Histogrammes** | `hist` sur 4 variables, puis `bins=3` | Vue d’ensemble des distributions |
@@ -554,6 +555,8 @@ Beaucoup d’**arbres de décision** qui votent. Souvent plus fort que la logist
 
 Le notebook enchaîne avec **RandomizedSearchCV** (recherche d’hyperparamètres) — plus long à exécuter.
 
+**§4.8** (après la 4.7) : **~1500 features encodées**, **SMOTE dans le pipeline**, optimisation **Gini normalisé**, avec un **tableau de bord** en 4 panneaux (`plot_rf_classification_dashboard`).
+
 ### Exécution locale (Windows)
 
 1. Sections **1 → 3** déjà faites.  
@@ -563,7 +566,7 @@ Le notebook enchaîne avec **RandomizedSearchCV** (recherche d’hyperparamètre
 
 ### Graphiques et interprétations (section 4)
 
-> Figures : `python run_section4_metrics.py` (ou après `generate_figures.py` étendu).
+> Le notebook est **autonome** : exécuter les cellules §4 (prérequis → 4.8 visualisation) génère les graphiques dans le notebook. Les scripts `run_section4_metrics.py` / `generate_figures.py` sont optionnels (README / export `figures/`).
 
 #### Régression linéaire — superficie
 
@@ -574,7 +577,15 @@ Le notebook enchaîne avec **RandomizedSearchCV** (recherche d’hyperparamètre
 | Nuage bleu très dispersé | Un même superficie peut donner 0 ou 1 — le sinistre n’est pas déterministe par la taille seule. |
 | Droite rouge qui monte | Tendance : **plus grand → risque un peu plus élevé** en moyenne. |
 
-#### Logistique + SMOTE — matrice de confusion
+#### Logistique + SMOTE — courbes et matrice de confusion
+
+![Courbes logistiques sans / avec SMOTE](figures/04_logistic_curves.png)
+
+| Ce qu’on voit | Interprétation |
+|---------------|----------------|
+| Nuage gris (0 / 1) | Observations réelles selon `superficief` |
+| Courbe sigmoïde | Probabilité \(P(\text{sinistre})\), bornée entre 0 et 1 |
+| Sans SMOTE vs avec SMOTE | Le rééquilibrage remonte la courbe → plus de sinistres détectés, parfois au prix de l’accuracy globale |
 
 ![Matrice de confusion logistique](figures/04_logistic_confusion.png)
 
@@ -595,6 +606,17 @@ Le notebook enchaîne avec **RandomizedSearchCV** (recherche d’hyperparamètre
 | Matrice RF | Performance du même ordre que la logistique sur ce run rapide ; le tuning du notebook peut faire mieux. |
 | Barres d’importance | **`superficief`** et **`EXPO`** comptent le plus parmi les deux features testées ici. |
 
+#### Forêt aléatoire — pipeline complet (Gini + SMOTE + features encodées)
+
+![Tableau de bord forêt aléatoire Gini](figures/04_rf_gini_dashboard.png)
+
+| Ce qu’on voit | Interprétation |
+|---------------|----------------|
+| Matrice (effectifs + %) | Lecture directe : sinistres détectés en bas-droite, fausses alertes en haut-droite. |
+| Rappel / précision | Compromis par classe ; le **Gini normalisé** (sous-titre) est la métrique du challenge. |
+| Courbe PR | Qualité du classement probabiliste ; point rouge = seuil 0,5. |
+| Top importances | Variables les plus utilisées par les arbres sur l’ensemble encodé. |
+
 ### Déroulé des sous-sections (notebook)
 
 | Section | Contenu |
@@ -603,8 +625,9 @@ Le notebook enchaîne avec **RandomizedSearchCV** (recherche d’hyperparamètre
 | **4.2** | Variable transformée (`log`) |
 | **4.3** | Régression multivariée |
 | **4.4–4.5** | Polynômes, Ridge, validation croisée |
-| **4.6** | Logistique, normalisation, SMOTE, `plot_conf_mat` |
+| **4.6** | Logistique, normalisation, SMOTE, `plot_logistic_curves_compare`, `plot_conf_mat` |
 | **4.7** | `RandomForestClassifier`, SMOTE, importances, `RandomizedSearchCV` (**score = Gini normalisé**) |
+| **4.8** | Tableau de bord RF (`build_feature_matrices_nb`, `ImbPipeline` + Gini, `show_figure`) |
 
 ---
 

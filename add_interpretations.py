@@ -80,7 +80,7 @@ INSERTIONS = [
 
 - **Diagonale :** histogramme de chaque variable.
 - **Hors diagonale :** nuage (X = colonne, Y = ligne) — chercher une forme (montée, bandes verticales, nuage rond).
-- **`EXPO` :** pic à 1 ; **`superficief` :** très asymétrique ; **`ft_2` :** 5 années ; **`ft_22` :** type « année » (construction).
+- **`EXPO` :** ~76 % année pleine, ~24 % partiels ; **`superficief` :** très asymétrique ; **`ft_2` :** 5 années ; **`ft_22` :** type « année » (construction).
 - Peu de relations **linéaires fortes** entre ces 4 variables → le sinistre (`target`, absent ici) se lit mieux sur la heatmap et les modèles.
 
 {LEGENDE_FT}
@@ -137,12 +137,12 @@ UPDATES = {
 - **Moustaches :** étendue « habituelle » ; **cercles noirs** = **outliers** (très grandes superficies, au-dessus du 75e percentile).
 - Distribution **très asymétrique** : beaucoup de petits/moyens bâtiments, quelques géants qui tirent la moyenne vers le haut.
 """,
-    39: """**Interprétation — boxplot `EXPO`**
+    39: """**Interprétation — distribution `EXPO`**
 
 - **`EXPO`** = fraction de l'année où le bâtiment était **assuré** (1 = année entière, 0,5 ≈ six mois).
-- Boîte **collée en haut à 1** : ~**76 %** des contrats sont des années pleines.
-- Points en dessous de 1 = couvertures **partielles** (minorité).
-- Boxplot peu informatif quand Q1 ≈ Q3 ≈ 1 — l'histogramme ou les effectifs sont plus parlants.
+- **Gauche :** ~**76 %** des contrats = **année pleine** (`EXPO = 1`) ; ~**24 %** = couverture **partielle**.
+- **Droite :** zoom sur les partielles, regroupées par **tranches** — beaucoup de valeurs proches de 1 mais pas exactement 1.
+- On évite le boxplot ici : avec Q1 ≈ Q3 ≈ 1, il **masquait** la structure réelle des données.
 """,
     26: """**Interprétation — déséquilibre de `target`**
 
@@ -154,12 +154,17 @@ UPDATES = {
 
 PLOT_HIST_GRID_CELL = '''def plot_hist_grid(data, columns, bins=30, figsize=(18, 12), ncols=3):
     """Histogrammes en grille lisible (grande figure, espacement, titres)."""
+    from visualization import plot_expo_on_ax
+
     n = len(columns)
     nrows = (n + ncols - 1) // ncols
     fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
     axes = np.atleast_1d(axes).ravel()
     for ax, col in zip(axes, columns):
         s = data[col].dropna()
+        if col == "EXPO":
+            plot_expo_on_ax(ax, s, title="EXPO")
+            continue
         nuniq = int(s.nunique())
         if nuniq <= 25:
             ax.hist(s, bins=nuniq, color="#4c72b0", edgecolor="white")

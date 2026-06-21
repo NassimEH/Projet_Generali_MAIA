@@ -137,7 +137,7 @@ def make_submission(
     from imblearn.over_sampling import SMOTE
     from imblearn.pipeline import Pipeline as ImbPipeline
     from sklearn.ensemble import RandomForestClassifier
-    from sklearn.model_selection import RandomizedSearchCV, train_test_split
+    from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold, train_test_split
     from scipy.stats import randint
 
     data_dir = Path(data_dir or Path(__file__).resolve().parent)
@@ -150,38 +150,86 @@ def make_submission(
         X_train, y_train, test_size=0.2, random_state=1, stratify=y_train
     )
 
-    base_rf = RandomForestClassifier(random_state=random_state, n_jobs=-1)
-    pipe = ImbPipeline(
-        [
-            ("smote", SMOTE(random_state=42)),
-            ("rf", base_rf),
-        ]
-    )
+    cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=random_state)
+    rf_grid = {
+        "rf__n_estimators": randint(150, 400),
+        "rf__max_leaf_nodes": randint(32, 256),
+        "rf__max_depth": randint(12, 40),
+        "rf__min_samples_leaf": randint(1, 6),
+        "rf__min_samples_split": randint(2, 16),
+        "rf__max_features": ["sqrt", "log2", 0.3, 0.5],
+        "rf__criterion": ["gini", "entropy"],
+    }
+    rf_grid_plain = {k.replace("rf__", ""): v for k, v in rf_grid.items()}
+
+    candidates = [
+        (
+            "smote",
+            ImbPipeline([
+                ("smote", SMOTE(random_state=42)),
+                ("rf", RandomForestClassifier(random_state=random_state, n_jobs=-1)),
+            ]),
+            rf_grid,
+        ),
+        (
+            "class_weight",
+            RandomForestClassifier(
+                random_state=random_state, n_jobs=-1, class_weight="balanced_subsample"
+            ),
+            rf_grid_plain,
+        ),
+        (
+            "smote_class_weight",
+            ImbPipeline([
+                ("smote", SMOTE(random_state=42)),
+                (
+                    "rf",
+                    RandomForestClassifier(
+                        random_state=random_state,
+                        n_jobs=-1,
+                        class_weight="balanced_subsample",
+                    ),
+                ),
+            ]),
+            rf_grid,
+        ),
+    ]
 
     if tune:
-        param_dist = {
-            "rf__n_estimators": randint(80, 200),
-            "rf__max_leaf_nodes": randint(16, 64),
-            "rf__max_depth": randint(8, 24),
-            "rf__min_samples_leaf": randint(1, 8),
-        }
-        search = RandomizedSearchCV(
-            pipe,
-            param_dist,
-            n_iter=12,
-            scoring=gini_scorer,
-            cv=3,
-            random_state=random_state,
-            n_jobs=-1,
-        )
-        search.fit(X_tr, y_tr)
-        model = search.best_estimator_
-        best_cv_gini = search.best_score_
+        best_name, best_search = None, None
+        for name, est, grid in candidates:
+            search = RandomizedSearchCV(
+                est,
+                grid,
+                n_iter=8,
+                scoring=gini_scorer,
+                cv=cv,
+                random_state=random_state,
+                n_jobs=-1,
+            )
+            search.fit(X_tr, y_tr)
+            if best_search is None or search.best_score_ > best_search.best_score_:
+                best_name, best_search = name, search
+        model = best_search.best_estimator_
+        best_cv_gini = best_search.best_score_
+        strategy = best_name
     else:
-        model = pipe
-        model.set_params(rf__n_estimators=100, rf__max_leaf_nodes=32)
+        model = ImbPipeline([
+            ("smote", SMOTE(random_state=42)),
+            (
+                "rf",
+                RandomForestClassifier(
+                    random_state=random_state,
+                    n_jobs=-1,
+                    class_weight="balanced_subsample",
+                    n_estimators=200,
+                    max_leaf_nodes=64,
+                ),
+            ),
+        ])
         model.fit(X_tr, y_tr)
         best_cv_gini = None
+        strategy = "default"
 
     val_proba = model.predict_proba(X_val)[:, 1]
     val_gini = normalized_gini(y_val.values, val_proba)
@@ -197,5 +245,6 @@ def make_submission(
         "n_test_expected": len(X_test_raw),
         "gini_validation_holdout": round(val_gini, 4),
         "gini_cv_best": round(best_cv_gini, 4) if best_cv_gini is not None else None,
+        "strategy": strategy,
     }
     return submission, metrics

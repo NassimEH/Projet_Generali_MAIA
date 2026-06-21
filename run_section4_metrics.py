@@ -76,6 +76,24 @@ acc_after = accuracy_score(y_te, y_pred)
 metrics["Accuracy logistique (sans SMOTE)"] = round(acc_before, 4)
 metrics["Accuracy logistique (avec SMOTE)"] = round(acc_after, 4)
 
+log_before = LogisticRegression(C=1, max_iter=1000)
+log_before.fit(X_tr_s, y_tr)
+log_after = LogisticRegression(C=1, max_iter=1000)
+log_after.fit(X_bal, y_bal)
+
+visualization.plot_logistic_curves_compare(
+    models=[log_before, log_after],
+    labels=["Sans SMOTE", "Avec SMOTE"],
+    X_df=df_tr[cols],
+    y=y_tr,
+    feature_name="superficief",
+    feature_names=cols,
+    scaler=scaler,
+    suptitle="4.6 — Courbes logistiques (superficief, EXPO fixé à la médiane)",
+    savepath=FIG / "04_logistic_curves.png",
+)
+plt.close()
+
 visualization.plot_conf_mat(
     y_te, y_pred, np.array(["pas sinistre", "sinistre"]), width=6, height=5
 )
@@ -102,6 +120,69 @@ plt.figure(figsize=(7, 4))
 visualization.plot_feature_importances(rf.feature_importances_, cols)
 plt.title("Importances — superficief vs EXPO")
 plt.savefig(FIG / "04_rf_importances.png", dpi=120, bbox_inches="tight")
+plt.close()
+
+# 4.7 bis — Forêt aléatoire complète (features encodées + Gini + SMOTE)
+from imblearn.pipeline import Pipeline as ImbPipeline
+from scipy.stats import randint
+from sklearn.model_selection import RandomizedSearchCV
+
+from ml_pipeline import (
+    build_feature_matrices,
+    gini_scorer,
+    load_raw_data,
+    normalized_gini,
+)
+
+df_train_full, X_test_raw = load_raw_data(DATA)
+X_all, y_all, _, _, feat_names = build_feature_matrices(df_train_full, X_test_raw)
+X_tr, X_te, y_tr, y_te = train_test_split(
+    X_all, y_all, test_size=0.2, random_state=1, stratify=y_all
+)
+pipe = ImbPipeline(
+    [
+        ("smote", SMOTE(random_state=42)),
+        ("rf", RandomForestClassifier(random_state=5, n_jobs=-1)),
+    ]
+)
+param_dist = {
+    "rf__n_estimators": randint(80, 200),
+    "rf__max_leaf_nodes": randint(16, 128),
+    "rf__max_depth": randint(8, 32),
+    "rf__min_samples_leaf": randint(1, 8),
+    "rf__criterion": ["gini", "entropy"],
+}
+rf_search = RandomizedSearchCV(
+    pipe,
+    param_dist,
+    n_iter=12,
+    scoring=gini_scorer,
+    cv=3,
+    random_state=5,
+    n_jobs=-1,
+)
+rf_search.fit(X_tr, y_tr)
+rf_model = rf_search.best_estimator_
+y_proba_te = rf_model.predict_proba(X_te)[:, 1]
+y_pred_te = rf_model.predict(X_te)
+gini_te = normalized_gini(y_te, y_proba_te)
+metrics["Gini normalisé RF (features encodées, hold-out)"] = round(gini_te, 4)
+metrics["Gini CV RF (features encodées)"] = round(rf_search.best_score_, 4)
+
+rf_clf = rf_model.named_steps["rf"]
+visualization.plot_rf_classification_dashboard(
+    y_te,
+    y_pred_te,
+    y_proba=y_proba_te,
+    feature_importances=rf_clf.feature_importances_,
+    feature_names=feat_names,
+    class_labels=np.array(["Pas de sinistre", "Sinistre"]),
+    gini_score=gini_te,
+    cv_gini=rf_search.best_score_,
+    top_n_features=15,
+    suptitle="4.7 bis — Forêt aléatoire (SMOTE + Gini, features encodées)",
+    savepath=FIG / "04_rf_gini_dashboard.png",
+)
 plt.close()
 
 print("=== Métriques section 4 ===")

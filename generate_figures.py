@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 import visualization
+from visualization import plot_expo_distribution, plot_expo_on_ax
 
 DATA_DIR = Path(__file__).resolve().parent
 FIG_DIR = DATA_DIR / "figures"
@@ -84,13 +85,7 @@ plt.tight_layout()
 plt.savefig(FIG_DIR / "03_boxplot_superficief.png", dpi=120, bbox_inches="tight")
 plt.close()
 
-fig, ax = plt.subplots(figsize=(7, 5))
-df.boxplot(column=["EXPO"], ax=ax)
-ax.set_title("EXPO (fraction année assurée) — majorité à 1")
-ax.set_ylabel("EXPO")
-plt.tight_layout()
-plt.savefig(FIG_DIR / "03_boxplot_expo.png", dpi=120, bbox_inches="tight")
-plt.close()
+plot_expo_distribution(df, savepath=FIG_DIR / "03_boxplot_expo.png")
 
 years_ft22 = df["ft_22_categ"].astype(int)
 fig, ax = plt.subplots(figsize=(10, 4))
@@ -136,7 +131,7 @@ plt.savefig(FIG_DIR / "03_hist_ft_2_categ.png", dpi=120, bbox_inches="tight")
 plt.close()
 
 _cols = ["superficief", "ft_2_categ", "ft_21_categ", "ft_22_categ", "EXPO", "target"]
-visualization.plot_corr(df[_cols], width=10, height=8, print_value=True, thresh=0.05)
+visualization.plot_corr(df[_cols], width=10, height=8, print_value=True, thresh=0, triangular="full")
 plt.savefig(FIG_DIR / "03_heatmap_correlations.png", dpi=120, bbox_inches="tight")
 plt.close()
 
@@ -153,6 +148,9 @@ _key = ["ft_2_categ", "ft_22_categ", "superficief", "EXPO"]
 fig, axes = plt.subplots(2, 2, figsize=(16, 11))
 for ax, col in zip(axes.ravel(), _key):
     s = df[col].dropna()
+    if col == "EXPO":
+        plot_expo_on_ax(ax, s, title="EXPO")
+        continue
     nuniq = int(s.nunique())
     b = nuniq if nuniq <= 25 else 30
     ax.hist(s, bins=b, color="#4c72b0", edgecolor="white")
